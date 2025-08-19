@@ -4,7 +4,8 @@ set -euo pipefail
 # Find non-root NVMe disks (ignore nvme0n1 since it's root)
 DISKS=$(lsblk -ndo NAME,TYPE | awk '$2=="disk"{print "/dev/"$1}' | grep -ve "nvme[01]n1")
 
-for DISK in $DISKS; do
+for _DISK in $DISKS; do
+  DISK=$($_DISK | sed "s|/dev/|/.bottlerocket/rootfs/dev/|")
   echo "Processing $DISK..."
 
   # Skip if already has a filesystem
