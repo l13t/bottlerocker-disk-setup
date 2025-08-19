@@ -5,7 +5,7 @@ set -euo pipefail
 DISKS=$(lsblk -ndo NAME,TYPE | awk '$2=="disk"{print "/dev/"$1}' | grep -ve "nvme[01]n1")
 
 for _DISK in $DISKS; do
-  DISK=$($_DISK | sed "s|/dev/|/.bottlerocket/rootfs/dev/|")
+  DISK=$(echo $_DISK | sed "s|/dev/|/.bottlerocket/rootfs/dev/|")
   echo "Processing $DISK..."
 
   # Skip if already has a filesystem
