@@ -16,7 +16,7 @@ for _DISK in $DISKS; do
     mkfs.xfs -b size=4096 -s size=4096 -m crc=0 -L DATA -f "$DISK"
   fi
 
-  MOUNTPOINT="/local/data-$(basename "$DISK")"
+  MOUNTPOINT="/.bottlerocket/rootfs/local/data-$(basename "$DISK")"
   mkdir -p "$MOUNTPOINT"
 
   echo "Mounting $DISK at $MOUNTPOINT..."
