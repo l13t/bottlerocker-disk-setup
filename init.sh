@@ -38,5 +38,6 @@ else
 fi
 
 mkdir -p "$BASE_MOUNT_POINT"
+ls -la "$BASE_MOUNT_POINT"/..
 echo "Mounting $DISK at $MOUNTPOINT..."
 mount -o discard,noatime,noquota,logbufs=8,logbsize=64k "$DISK" "$MOUNTPOINT"
