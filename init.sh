@@ -1,18 +1,42 @@
-#!/usr/bin/env bash
+#!/bin/bash
+# set -euo pipefail
+
+# # Find non-root NVMe disks (ignore nvme0n1 since it's root)
+# DISKS=$(lsblk -ndo NAME,TYPE | awk '$2=="disk"{print "/dev/"$1}' | grep -ve "nvme[01]n1")
+
+# for _DISK in $DISKS; do
+#   DISK=$(echo $_DISK | sed "s|/dev/|/.bottlerocket/rootfs/dev/|")
+#   echo "Processing $DISK..."
+
+#   # Skip if already has a filesystem
+#   if blkid "$DISK" >/dev/null 2>&1; then
+#     echo "$DISK already formatted, skipping mkfs."
+#   else
+#     echo "Formatting $DISK with XFS..."
+#     mkfs.xfs -b size=4096 -s size=4096 -m crc=0 -L DATA -f "$DISK"
+#   fi
+
+#   MOUNTPOINT="/.bottlerocket/rootfs/local/data-$(basename "$DISK")"
+#   mkdir -p "$MOUNTPOINT"
+
+#   echo "Mounting $DISK at $MOUNTPOINT..."
+#   mount -o discard,noatime,noquota,logbufs=8,logbsize=64k "$DISK" "$MOUNTPOINT"
+# done
+
+# echo "All disks processed."
+
 set -ex
 
 DISK=/.bottlerocket/rootfs/dev/nvme2n1
-PARTITIONS_CREATED=/.bottlerocket/bootstrap-containers/current/created
-BASE_MOUNT_POINT=/.bottlerocket/rootfs/mnt
+BASE_MOUNT_POINT=/.bottlerocket/rootfs/mnt/data
 
-# If the disk hasn't been partitioned, create the partitions and format them
-if [ ! -f $PARTITIONS_CREATED ]; then
-  parted -s $DISK mklabel gpt 1>/dev/null
-  parted -s $DISK mkpart primary ext4 0% 100% 1>/dev/null
-  mkfs.ext4 -F ${DISK}p1
-  touch $PARTITIONS_CREATED
+if blkid "$DISK" >/dev/null 2>&1; then
+  echo "$DISK already formatted, skipping mkfs."
+else
+  echo "Formatting $DISK with XFS..."
+  mkfs.xfs -b size=4096 -s size=4096 -m crc=0 -L DATA -f "$DISK"
 fi
 
-mkdir -p $BASE_MOUNT_POINT/data
-
-mount ${DISK}p1 $BASE_MOUNT_POINT/data
+mkdir -p "$BASE_MOUNT_POINT"
+echo "Mounting $DISK at $MOUNTPOINT..."
+mount -o discard,noatime,noquota,logbufs=8,logbsize=64k "$DISK" "$MOUNTPOINT"
