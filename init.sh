@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Find non-root NVMe disks (ignore nvme0n1 since it's root)
-DISKS=$(lsblk -ndo NAME,TYPE | awk '$2=="disk"{print "/dev/"$1}' | grep -v nvme0n1)
+DISKS=$(lsblk -ndo NAME,TYPE | awk '$2=="disk"{print "/dev/"$1}' | grep -ve "nvme[01]n1")
 
 for DISK in $DISKS; do
   echo "Processing $DISK..."
