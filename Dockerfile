@@ -4,6 +4,7 @@ RUN dnf install -y \
   util-linux \
   e2fsprogs \
   xfsprogs \
+  parted \
   findutils \
   && dnf clean all
 
