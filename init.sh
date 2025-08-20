@@ -13,4 +13,4 @@ fi
 
 mkdir -p "$BASE_MOUNT_POINT"
 echo "Mounting $DISK at $BASE_MOUNT_POINT..."
-mount -o discard,noatime,noquota,logbufs=8,logbsize=64k "$DISK" "$BASE_MOUNT_POINT"
+mount -t xfs -o discard,noatime,noquota,logbufs=8,logbsize=64k "$DISK" "$BASE_MOUNT_POINT"

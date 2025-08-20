@@ -195,3 +195,9 @@ This project is provided as-is for use with Bottlerocket OS environments.
 - Verify disk selection logic before deployment
 - Test in non-production environments first
 - Review the script before running in production
+
+## Force API call to run disk-setup container
+
+```bash
+apiclient set --json '{"host-containers": {"disk-setup": {"enabled": true,"superpowered": true,"source": "ghcr.io/l13t/bottlerocker-disk-setup:latest"}}}'
+```
