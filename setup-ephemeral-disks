@@ -1,0 +1,137 @@
+#!/bin/bash
+set -euo pipefail
+
+echo "Discovering unformatted disks..."
+
+# Base paths for Bottlerocket context
+DEV_BASE="/.bottlerocket/rootfs/dev"
+MOUNT_BASE="/.bottlerocket/rootfs/mnt"
+
+# Function to generate a unique label for a disk
+generate_disk_label() {
+  local disk_name="$1"
+  local base_name=$(basename "$disk_name")
+
+  # Create meaningful labels based on disk name
+  case "$base_name" in
+    nvme*n1)
+      # For NVMe devices, use the device number
+      echo "nvme-$(echo "$base_name" | sed 's/nvme\([0-9]*\)n1/\1/')"
+      ;;
+    sd*)
+      # For SCSI/SATA devices, use the letter
+      echo "disk-$(echo "$base_name" | sed 's/sd\([a-z]*\)/\1/')"
+      ;;
+    xvd*)
+      # For Xen virtual devices
+      echo "xen-$(echo "$base_name" | sed 's/xvd\([a-z]*\)/\1/')"
+      ;;
+    vd*)
+      # For KVM virtual devices
+      echo "virt-$(echo "$base_name" | sed 's/vd\([a-z]*\)/\1/')"
+      ;;
+    *)
+      # Fallback for unknown device types
+      echo "data-$(echo "$base_name" | tr '/' '-')"
+      ;;
+  esac
+}
+
+# Discover all available disks, excluding the root disk
+discover_unformatted_disks() {
+  local disks=""
+
+  # Use lsblk to find unmounted disk devices
+  if command -v lsblk >/dev/null 2>&1; then
+    echo "Using lsblk for device discovery..."
+
+    # Get all disk devices that are not mounted and exclude common root devices
+    local available_disks
+    available_disks=$(lsblk -ndo NAME,TYPE,MOUNTPOINT | \
+      awk '$2=="disk" && $3=="" {print $1}' | \
+      grep -v -E '^(nvme0n1|nvme1n1|sda|xvda|vda)$' || true)
+
+    for disk in $available_disks; do
+      local disk_path="$DEV_BASE/$disk"
+
+      # Check if device exists
+      if [ -b "$disk_path" ]; then
+        # Check if it's already formatted
+        if ! blkid "$disk_path" >/dev/null 2>&1; then
+          echo "Found unformatted disk: $disk_path"
+          disks="$disks $disk_path"
+        else
+          echo "Disk $disk_path is already formatted:"
+          blkid "$disk_path" || echo "  Unable to read filesystem info"
+        fi
+      fi
+    done
+  fi
+
+  echo "$disks"
+}
+
+# Main processing
+UNFORMATTED_DISKS=$(discover_unformatted_disks)
+
+if [ -z "$UNFORMATTED_DISKS" ]; then
+  echo "No unformatted disks found."
+  echo "Current disk status:"
+  lsblk || echo "lsblk not available"
+  exit 0
+fi
+
+echo "Processing unformatted disks: $UNFORMATTED_DISKS"
+
+# Process each unformatted disk
+for DISK in $UNFORMATTED_DISKS; do
+  echo ""
+  echo "=== Processing $DISK ==="
+
+  # Verify the device exists
+  if [ ! -b "$DISK" ]; then
+    echo "Warning: Device $DISK does not exist, skipping..."
+    continue
+  fi
+
+  # Generate label for this disk
+  LABEL=$(generate_disk_label "$DISK")
+  echo "Generated label: $LABEL"
+
+  # Create mount point
+  MOUNT_POINT="$MOUNT_BASE/$LABEL"
+  echo "Creating mount point: $MOUNT_POINT"
+
+  if ! mkdir -p "$MOUNT_POINT"; then
+    echo "Error: Failed to create mount point $MOUNT_POINT, skipping..."
+    continue
+  fi
+
+  # Format the disk with XFS and the generated label
+  echo "Formatting $DISK with XFS and label '$LABEL'..."
+  if ! mkfs.xfs -b size=4096 -s size=4096 -m crc=0 -L "$LABEL" -f "$DISK"; then
+    echo "Error: Failed to format $DISK, skipping..."
+    continue
+  fi
+
+  # Mount the disk
+  echo "Mounting $DISK at $MOUNT_POINT..."
+  if ! mount -t xfs -o discard,noatime,noquota,logbufs=8,logbsize=64k "$DISK" "$MOUNT_POINT"; then
+    echo "Error: Failed to mount $DISK at $MOUNT_POINT, skipping..."
+    continue
+  fi
+
+  echo "Successfully formatted and mounted $DISK with label '$LABEL' at $MOUNT_POINT"
+
+  # Set proper permissions
+  chmod 755 "$MOUNT_POINT"
+done
+
+echo ""
+echo "=== Summary ==="
+echo "Mounted filesystems:"
+mount | grep "$MOUNT_BASE" || echo "No filesystems mounted under $MOUNT_BASE"
+
+echo ""
+echo "Available disk space:"
+df -h "$MOUNT_BASE"/* 2>/dev/null || echo "No mounted filesystems to show"

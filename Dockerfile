@@ -1,14 +1,7 @@
-FROM public.ecr.aws/amazonlinux/amazonlinux:2023
+FROM alpine:3.22
 
-RUN dnf install -y \
-  util-linux \
-  e2fsprogs \
-  xfsprogs \
-  parted \
-  findutils \
-  && dnf clean all
+COPY setup-ephemeral-disks ./
+RUN apk add xfsprogs e2fsprogs bash parted && \
+	chmod +x ./setup-ephemeral-disks
 
-COPY init.sh /init.sh
-RUN chmod +x /init.sh
-
-ENTRYPOINT ["/init.sh"]
+ENTRYPOINT ["bash", "setup-ephemeral-disks"]
